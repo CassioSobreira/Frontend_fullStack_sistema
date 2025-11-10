@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import TextType from "../components/shared/TextType";
 import MetaBalls from "../components/shared/MetaBalls";
 import { useAuth } from "../hooks/useAuth";
+import { authService } from "../lib/auth";
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -30,6 +31,20 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setIsLoading(true);
+
+    // Validação básica de email
+    const emailValidation = authService.validateEmail(form.email);
+    if (!emailValidation.valid) {
+      setError(emailValidation.error || "Email inválido");
+      setIsLoading(false);
+      return;
+    }
+
+    if (!form.password || form.password.length === 0) {
+      setError("Senha é obrigatória");
+      setIsLoading(false);
+      return;
+    }
 
     try {
       await login(form);

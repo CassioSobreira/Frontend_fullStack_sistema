@@ -37,6 +37,19 @@ export default function CadastroPage() {
     setIsLoading(true);
 
     // Validações
+    const emailValidation = authService.validateEmail(form.email);
+    if (!emailValidation.valid) {
+      setError(emailValidation.error || "Email inválido");
+      setIsLoading(false);
+      return;
+    }
+
+    if (!form.name || form.name.trim().length < 2) {
+      setError("Nome deve ter pelo menos 2 caracteres");
+      setIsLoading(false);
+      return;
+    }
+
     if (form.password !== form.confirmPassword) {
       setError("As senhas não conferem");
       setIsLoading(false);
@@ -50,8 +63,9 @@ export default function CadastroPage() {
       return;
     }
 
-    if (!form.dateOfBirth) {
-      setError("Data de nascimento é obrigatória");
+    const dateValidation = authService.validateDateOfBirth(form.dateOfBirth);
+    if (!dateValidation.valid) {
+      setError(dateValidation.error || "Data de nascimento inválida");
       setIsLoading(false);
       return;
     }

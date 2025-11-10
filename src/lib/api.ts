@@ -68,15 +68,38 @@ class ApiClient {
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     
+    // Timeout de 30 segundos
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    
+    // Se já houver um signal nas options, combina com o nosso
+    if (options.signal) {
+      options.signal.addEventListener('abort', () => controller.abort());
+    }
+    
     const config: RequestInit = {
       ...options,
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
       },
     };
 
-    const response = await fetch(url, config);
+    let response: Response;
+    try {
+      response = await fetch(url, config);
+      clearTimeout(timeoutId);
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Tempo de requisição excedido. Verifique sua conexão.');
+      }
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Erro de conexão. Verifique se o servidor está rodando.');
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       let errorMessage = `Erro ${response.status}: ${response.statusText}`;

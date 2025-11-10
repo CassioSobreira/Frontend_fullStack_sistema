@@ -39,7 +39,14 @@ export class AuthService {
   getUser(): User | null {
     if (typeof window !== 'undefined') {
       const userStr = localStorage.getItem(USER_KEY);
-      return userStr ? JSON.parse(userStr) : null;
+      if (!userStr) return null;
+      try {
+        return JSON.parse(userStr);
+      } catch {
+        // Se houver erro ao parsear, limpa o storage corrompido
+        localStorage.removeItem(USER_KEY);
+        return null;
+      }
     }
     return null;
   }
@@ -53,7 +60,14 @@ export class AuthService {
   getPermissions(): string[] {
     if (typeof window !== 'undefined') {
       const permissionsStr = localStorage.getItem(PERMISSIONS_KEY);
-      return permissionsStr ? JSON.parse(permissionsStr) : [];
+      if (!permissionsStr) return [];
+      try {
+        return JSON.parse(permissionsStr);
+      } catch {
+        // Se houver erro ao parsear, limpa o storage corrompido
+        localStorage.removeItem(PERMISSIONS_KEY);
+        return [];
+      }
     }
     return [];
   }
@@ -68,9 +82,55 @@ export class AuthService {
     this.stopRefreshTimer();
   }
 
+  // Validação de email
+  validateEmail(email: string): { valid: boolean; error?: string } {
+    if (!email || email.trim() === '') {
+      return { valid: false, error: 'Email é obrigatório' };
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return { valid: false, error: 'Email inválido' };
+    }
+    return { valid: true };
+  }
+
+  // Validação de data de nascimento
+  validateDateOfBirth(dateOfBirth: string): { valid: boolean; error?: string } {
+    if (!dateOfBirth) {
+      return { valid: false, error: 'Data de nascimento é obrigatória' };
+    }
+    const date = new Date(dateOfBirth);
+    const today = new Date();
+    const age = today.getFullYear() - date.getFullYear();
+    const monthDiff = today.getMonth() - date.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < date.getDate())) {
+      const actualAge = age - 1;
+      if (actualAge < 13) {
+        return { valid: false, error: 'Você deve ter pelo menos 13 anos' };
+      }
+      if (actualAge > 120) {
+        return { valid: false, error: 'Data de nascimento inválida' };
+      }
+    } else {
+      if (age < 13) {
+        return { valid: false, error: 'Você deve ter pelo menos 13 anos' };
+      }
+      if (age > 120) {
+        return { valid: false, error: 'Data de nascimento inválida' };
+      }
+    }
+    
+    if (isNaN(date.getTime())) {
+      return { valid: false, error: 'Data de nascimento inválida' };
+    }
+    
+    return { valid: true };
+  }
+
   // Validação de senha conforme especificação
   validatePassword(password: string): { valid: boolean; error?: string } {
-    if (password.length < 8) {
+    if (!password || password.length < 8) {
       return { valid: false, error: 'A senha deve ter no mínimo 8 caracteres' };
     }
     if (!/[A-Z]/.test(password)) {
