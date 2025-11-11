@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { authService } from "../lib/auth";
+import { redirectToDashboard } from "../lib/redirect";
 
 export default function CadastroPage() {
   const [form, setForm] = useState({ 
@@ -17,12 +18,9 @@ export default function CadastroPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      if (user?.role === 'admin') {
-        navigate('/dashboard/admin');
-      } else {
-        navigate('/dashboard/client');
-      }
+    if (!authLoading && isAuthenticated && user) {
+      // Redireciona baseado no role do usuário
+      redirectToDashboard(user, navigate);
     }
   }, [isAuthenticated, authLoading, user, navigate]);
 

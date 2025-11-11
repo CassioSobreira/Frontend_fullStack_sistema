@@ -5,6 +5,7 @@ import MetaBalls from "../components/shared/MetaBalls";
 import GoogleLoginButton from "../components/auth/GoogleLoginButton";
 import { useAuth } from "../hooks/useAuth";
 import { authService } from "../lib/auth";
+import { redirectToDashboard } from "../lib/redirect";
 import MagnetLines from "@/components/shared/MagnetLines";
 
 export default function LoginPage() {
@@ -15,13 +16,9 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      // Redireciona baseado no role
-      if (user?.role === 'admin') {
-        navigate('/dashboard/admin');
-      } else {
-        navigate('/dashboard/client');
-      }
+    if (!authLoading && isAuthenticated && user) {
+      // Redireciona baseado no role do usuário
+      redirectToDashboard(user, navigate);
     }
   }, [isAuthenticated, authLoading, user, navigate]);
 

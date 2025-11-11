@@ -1,35 +1,15 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
 export default function ClientDashboard() {
-  const { user, isAuthenticated, isLoading, logout, isAdmin } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      navigate("/");
-    } else if (!isLoading && isAdmin) {
-      navigate("/dashboard/admin");
-    }
-  }, [isAuthenticated, isLoading, isAdmin, navigate]);
 
   const handleLogout = async () => {
     await logout();
     navigate("/");
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-white text-xl">Carregando...</div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
 
   return (
     <div className="flex flex-col items-center justify-center gap-6 w-full max-w-4xl mx-auto p-6">

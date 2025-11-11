@@ -223,6 +223,32 @@ O projeto utiliza:
 - Admins são redirecionados para `/dashboard/admin`
 - Clientes são redirecionados para `/dashboard/client`
 
+## 🚀 Deploy no Vercel
+
+Para fazer deploy no Vercel, consulte o guia completo em [DEPLOY.md](./DEPLOY.md).
+
+### Resumo Rápido
+
+1. **Push para repositório Git** (GitHub, GitLab ou Bitbucket)
+2. **Importar no Vercel**: Acesse [vercel.com](https://vercel.com) e importe seu repositório
+3. **Configurar variáveis de ambiente**:
+   - `VITE_API_URL`: URL do seu backend
+   - `VITE_GOOGLE_CLIENT_ID`: Client ID do Google OAuth (opcional)
+4. **Deploy automático**: O Vercel fará o deploy automaticamente
+
+O arquivo `vercel.json` já está configurado com as opções corretas para o projeto Vite.
+
+## 🔐 Fluxo de Autenticação e Cadastro
+
+Para entender como funciona o cadastramento de usuários e o redirecionamento para os dashboards, consulte [FLUXO_AUTENTICACAO.md](./FLUXO_AUTENTICACAO.md).
+
+### Resumo do Fluxo
+
+- **Novos usuários**: Sempre são criados com `role: 'client'` e redirecionados para `/dashboard/client`
+- **Usuários admin**: Role é definido no backend; após login, são redirecionados para `/dashboard/admin`
+- **Proteção de rotas**: O sistema usa `ProtectedRoute` para proteger rotas baseado no role do usuário
+- **Redirecionamento automático**: Baseado no `role` retornado pelo backend após autenticação
+
 ## 🐛 Troubleshooting
 
 ### Erro de CORS
