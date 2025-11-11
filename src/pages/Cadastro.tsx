@@ -68,15 +68,26 @@ export default function CadastroPage() {
 
     try {
       await register({
-        name: form.name,
-        email: form.email,
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
         password: form.password,
         confirmPassword: form.confirmPassword,
         dateOfBirth: form.dateOfBirth,
         role: 'client'
       });
     } catch (err: any) {
-      setError(err.message || "Erro ao cadastrar. Tente novamente.");
+      // Exibe a mensagem de erro retornada pelo backend
+      const errorMessage = err.message || "Erro ao cadastrar. Tente novamente.";
+      setError(errorMessage);
+      
+      // Log para debug (apenas em desenvolvimento)
+      if (import.meta.env.DEV) {
+        console.error('Erro no cadastro:', {
+          message: err.message,
+          status: err.status,
+          details: err.details,
+        });
+      }
     } finally {
       setIsLoading(false);
     }

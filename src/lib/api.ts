@@ -25,12 +25,23 @@ export interface AuthResponse {
   permissions: string[];
 }
 
+// Interface para dados de registro no frontend (usa dateOfBirth)
 export interface RegisterData {
   email: string;
   password: string;
   confirmPassword: string;
   name: string;
   dateOfBirth: string;
+  role?: 'client' | 'admin';
+}
+
+// Interface para dados enviados ao backend (usa birthDate)
+interface RegisterRequestData {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  name: string;
+  birthDate: string;
   role?: 'client' | 'admin';
 }
 
@@ -67,6 +78,20 @@ class ApiClient {
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
+  }
+
+  // Traduz nomes de campos do backend para português
+  private translateFieldName(field: string): string {
+    const translations: Record<string, string> = {
+      name: 'Nome',
+      email: 'Email',
+      password: 'Senha',
+      confirmPassword: 'Confirmar Senha',
+      birthDate: 'Data de Nascimento',
+      dateOfBirth: 'Data de Nascimento',
+      role: 'Perfil',
+    };
+    return translations[field] || field;
   }
 
   private async request<T>(
@@ -138,34 +163,82 @@ class ApiClient {
 
     if (!response.ok) {
       let errorMessage = `Erro ${response.status}: ${response.statusText}`;
+      let errorDetails: any = null;
       
       // Mensagens específicas para erros comuns
       if (response.status === 404) {
         errorMessage = `Endpoint não encontrado: ${url}. Verifique se a URL da API está correta: ${this.baseURL}`;
+      } else if (response.status === 422) {
+        // Erro de validação - precisa extrair detalhes
+        errorMessage = 'Erro de validação. Verifique os dados informados.';
       } else if (response.status === 500) {
         errorMessage = 'Erro interno do servidor. Tente novamente mais tarde.';
       } else if (response.status === 503) {
         errorMessage = 'Serviço temporariamente indisponível. Tente novamente mais tarde.';
       }
       
+      // Clona a resposta para poder ler o JSON múltiplas vezes se necessário
+      const responseClone = response.clone();
+      
       try {
-        const errorData = await response.json();
+        const errorData = await responseClone.json();
+        errorDetails = errorData;
         
-        // Tenta diferentes formatos de mensagem de erro
-        if (errorData.message) {
-          errorMessage = errorData.message;
-        } else if (errorData.error) {
-          errorMessage = errorData.error;
-        } else if (Array.isArray(errorData.errors)) {
-          errorMessage = errorData.errors.join(', ');
-        } else if (typeof errorData === 'string') {
-          errorMessage = errorData;
+        // Para erro 422, extrai mensagens de validação detalhadas
+        if (response.status === 422) {
+          // Tenta diferentes formatos de resposta de validação
+          if (errorData.message && typeof errorData.message === 'string') {
+            errorMessage = errorData.message;
+          } else if (errorData.error && typeof errorData.error === 'string') {
+            errorMessage = errorData.error;
+          } else if (Array.isArray(errorData.errors)) {
+            // Formato: { errors: ["erro1", "erro2"] }
+            errorMessage = errorData.errors.join('; ');
+          } else if (errorData.errors && typeof errorData.errors === 'object') {
+            // Formato: { errors: { field: ["msg"], field2: ["msg2"] } }
+            const errorMessages: string[] = [];
+            for (const [field, messages] of Object.entries(errorData.errors)) {
+              if (Array.isArray(messages)) {
+                errorMessages.push(...messages.map((msg: string) => `${this.translateFieldName(field)}: ${msg}`));
+              } else if (typeof messages === 'string') {
+                errorMessages.push(`${this.translateFieldName(field)}: ${messages}`);
+              }
+            }
+            if (errorMessages.length > 0) {
+              errorMessage = errorMessages.join('; ');
+            }
+          }
+        } else {
+          // Para outros erros, tenta diferentes formatos de mensagem
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (Array.isArray(errorData.errors)) {
+            errorMessage = errorData.errors.join(', ');
+          } else if (typeof errorData === 'string') {
+            errorMessage = errorData;
+          }
         }
-      } catch {
-        // Se não conseguir parsear JSON, usa a mensagem padrão
+      } catch (parseError) {
+        // Se não conseguir parsear JSON, tenta ler como texto para 422
+        if (response.status === 422) {
+          try {
+            const textResponse = response.clone();
+            const text = await textResponse.text();
+            if (text) {
+              errorMessage = text || errorMessage;
+            }
+          } catch {
+            // Ignora se não conseguir ler como texto
+          }
+        }
       }
       
-      throw new Error(errorMessage);
+      const error = new Error(errorMessage);
+      (error as any).status = response.status;
+      (error as any).details = errorDetails;
+      throw error;
     }
 
     if (response.status === 204) {
@@ -179,32 +252,76 @@ class ApiClient {
     return this.request<{ status: string }>('/health/');
   }
 
+  // Normaliza a resposta do backend para a interface User do frontend
+  private normalizeUser(user: any): User {
+    return {
+      ...user,
+      // Converte birthDate (backend) para dateOfBirth (frontend) se necessário
+      dateOfBirth: user.birthDate || user.dateOfBirth || '',
+    };
+  }
+
   async register(data: RegisterData): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/auth/register', {
+    // Converte dateOfBirth para birthDate (formato esperado pelo backend)
+    // Baseado no Swagger, o backend espera: name, email, password, confirmPassword, birthDate
+    // O campo role não é enviado no cadastro (o backend define o role padrão)
+    const requestData: RegisterRequestData = {
+      name: data.name.trim(),
+      email: data.email.trim().toLowerCase(),
+      password: data.password,
+      confirmPassword: data.confirmPassword,
+      birthDate: data.dateOfBirth, // O backend espera birthDate no formato YYYY-MM-DD
+    };
+    
+    const response = await this.request<AuthResponse>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(requestData),
     });
+    
+    // Normaliza a resposta para garantir que dateOfBirth está presente
+    return {
+      ...response,
+      user: this.normalizeUser(response.user),
+    };
   }
 
   async login(data: LoginData): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/auth/login', {
+    const response = await this.request<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    
+    // Normaliza a resposta para garantir que dateOfBirth está presente
+    return {
+      ...response,
+      user: this.normalizeUser(response.user),
+    };
   }
 
   async googleLogin(data: GoogleLoginData): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/auth/login/google', {
+    const response = await this.request<AuthResponse>('/auth/login/google', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    
+    // Normaliza a resposta para garantir que dateOfBirth está presente
+    return {
+      ...response,
+      user: this.normalizeUser(response.user),
+    };
   }
 
   async refreshToken(data: RefreshTokenData): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/auth/token/refresh', {
+    const response = await this.request<AuthResponse>('/auth/token/refresh', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    
+    // Normaliza a resposta para garantir que dateOfBirth está presente
+    return {
+      ...response,
+      user: this.normalizeUser(response.user),
+    };
   }
 
   async logout(data: RefreshTokenData): Promise<void> {
@@ -215,19 +332,35 @@ class ApiClient {
   }
 
   async getMe(accessToken: string): Promise<{ user: User; permissions: string[] }> {
-    return this.request<{ user: User; permissions: string[] }>('/auth/me', {
+    const response = await this.request<{ user: User; permissions: string[] }>('/auth/me', {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
     });
+    
+    // Normaliza a resposta para garantir que dateOfBirth está presente
+    return {
+      ...response,
+      user: this.normalizeUser(response.user),
+    };
   }
 
   async validateToken(data: ValidateTokenData): Promise<ValidateTokenResponse> {
-    return this.request<ValidateTokenResponse>('/auth/token/introspect', {
+    const response = await this.request<ValidateTokenResponse>('/auth/token/introspect', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    
+    // Normaliza a resposta se houver user
+    if (response.user) {
+      return {
+        ...response,
+        user: this.normalizeUser(response.user),
+      };
+    }
+    
+    return response;
   }
 
   async getUsers(accessToken: string): Promise<{ users: User[] }> {
@@ -240,12 +373,18 @@ class ApiClient {
   }
 
   async getUserById(accessToken: string, id: string): Promise<{ user: User; permissions: string[] }> {
-    return this.request<{ user: User; permissions: string[] }>(`/auth/users/${id}`, {
+    const response = await this.request<{ user: User; permissions: string[] }>(`/auth/users/${id}`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
     });
+    
+    // Normaliza a resposta para garantir que dateOfBirth está presente
+    return {
+      ...response,
+      user: this.normalizeUser(response.user),
+    };
   }
 }
 
