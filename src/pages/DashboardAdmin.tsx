@@ -1,18 +1,60 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useEffect } from "react";
 
 export default function AdminDashboard() {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading, isAuthenticated, isAdmin } = useAuth();
   const navigate = useNavigate();
+
+  // Debug: Log para verificar o estado
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('AdminDashboard - Estado:', {
+        user,
+        isLoading,
+        isAuthenticated,
+        isAdmin,
+        userRole: user?.role,
+      });
+    }
+  }, [user, isLoading, isAuthenticated, isAdmin]);
 
   const handleLogout = async () => {
     await logout();
     navigate("/");
   };
 
+  // Mostra loading enquanto carrega
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-white text-xl">Carregando...</div>
+      </div>
+    );
+  }
+
+  // Se não está autenticado ou não é admin, não deveria chegar aqui (ProtectedRoute bloqueia)
+  // Mas adicionamos uma verificação de segurança
+  if (!isAuthenticated || !isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-white text-xl">Acesso negado</div>
+      </div>
+    );
+  }
+
+  // Se user não estiver disponível, mostra mensagem
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-white text-xl">Carregando dados do usuário...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col items-center justify-center gap-6 w-full max-w-4xl mx-auto p-6">
-      <div className="w-full bg-gray-800/90 backdrop-blur-md rounded-xl shadow-2xl border border-gray-700/60 p-8">
+    <div className="flex flex-col items-center justify-center gap-6 w-full max-w-4xl mx-auto p-6 relative z-30">
+      <div className="w-full bg-gray-800/90 backdrop-blur-md rounded-xl shadow-2xl border border-gray-700/60 p-8 relative z-30">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-white">Dashboard do Administrador</h1>
           <button
@@ -27,10 +69,21 @@ export default function AdminDashboard() {
           <div className="bg-gray-900/50 rounded-lg p-4">
             <h2 className="text-xl font-semibold text-white mb-2">Informações do Administrador</h2>
             <div className="space-y-2 text-gray-300">
-              <p><strong className="text-white">Nome:</strong> {user?.name}</p>
-              <p><strong className="text-white">Email:</strong> {user?.email}</p>
-              <p><strong className="text-white">Data de Nascimento:</strong> {user?.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString('pt-BR') : 'N/A'}</p>
-              <p><strong className="text-white">Role:</strong> {user?.role}</p>
+              <p><strong className="text-white">Nome:</strong> {user.name || 'N/A'}</p>
+              <p><strong className="text-white">Email:</strong> {user.email || 'N/A'}</p>
+              <p><strong className="text-white">Data de Nascimento:</strong> {
+                user.dateOfBirth 
+                  ? new Date(user.dateOfBirth).toLocaleDateString('pt-BR') 
+                  : (user as any).birthDate
+                  ? new Date((user as any).birthDate).toLocaleDateString('pt-BR')
+                  : 'N/A'
+              }</p>
+              <p><strong className="text-white">Role:</strong> {user.role || 'N/A'}</p>
+              {import.meta.env.DEV && (
+                <p className="text-xs text-gray-500 mt-2 break-all">
+                  Debug: user object = {JSON.stringify(user, null, 2)}
+                </p>
+              )}
             </div>
           </div>
 
