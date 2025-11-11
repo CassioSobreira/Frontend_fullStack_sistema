@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import TextType from "../components/shared/TextType";
-import MetaBalls from "../components/shared/MetaBalls";
 import GoogleLoginButton from "../components/auth/GoogleLoginButton";
 import { useAuth } from "../hooks/useAuth";
 import { authService } from "../lib/auth";

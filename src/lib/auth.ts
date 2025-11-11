@@ -1,4 +1,4 @@
-import { apiClient, type AuthResponse, type User } from './api';
+import { apiClient, type User } from './api';
 
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
