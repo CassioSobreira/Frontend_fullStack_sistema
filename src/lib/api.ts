@@ -132,7 +132,7 @@ class ApiClient {
   }
 
   async healthCheck(): Promise<{ status: string }> {
-    return this.request<{ status: string }>('/health');
+    return this.request<{ status: string }>('/health/');
   }
 
   async register(data: RegisterData): Promise<AuthResponse> {
@@ -150,14 +150,14 @@ class ApiClient {
   }
 
   async googleLogin(data: GoogleLoginData): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/auth/google', {
+    return this.request<AuthResponse>('/auth/login/google', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async refreshToken(data: RefreshTokenData): Promise<AuthResponse> {
-    return this.request<AuthResponse>('/auth/refresh', {
+    return this.request<AuthResponse>('/auth/token/refresh', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -180,7 +180,7 @@ class ApiClient {
   }
 
   async validateToken(data: ValidateTokenData): Promise<ValidateTokenResponse> {
-    return this.request<ValidateTokenResponse>('/auth/validate', {
+    return this.request<ValidateTokenResponse>('/auth/token/introspect', {
       method: 'POST',
       body: JSON.stringify(data),
     });
