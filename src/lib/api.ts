@@ -1,4 +1,11 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Normaliza a URL da API removendo barra final e garantindo formato correto
+const getApiBaseUrl = (): string => {
+  const url = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  // Remove barras no final
+  return url.replace(/\/+$/, '');
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export interface User {
   id: string;
@@ -66,7 +73,10 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${this.baseURL}${endpoint}`;
+    // Garante que o endpoint começa com /
+    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    // Remove barras duplas que possam ocorrer
+    const url = `${this.baseURL}${normalizedEndpoint}`.replace(/([^:]\/)\/+/g, '$1');
     
     // Timeout de 30 segundos
     const controller = new AbortController();
@@ -84,6 +94,8 @@ class ApiClient {
         'Content-Type': 'application/json',
         ...options.headers,
       },
+      // Garante que não há redirecionamento automático que possa causar problemas com CORS
+      redirect: 'error' as RequestRedirect,
     };
 
     let response: Response;
@@ -95,14 +107,46 @@ class ApiClient {
       if (error.name === 'AbortError') {
         throw new Error('Tempo de requisição excedido. Verifique sua conexão.');
       }
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new Error('Erro de conexão. Verifique se o servidor está rodando.');
+      if (error instanceof TypeError) {
+        if (error.message.includes('fetch')) {
+          throw new Error('Erro de conexão. Verifique se o servidor está rodando e a URL da API está correta.');
+        }
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error(`Erro de conexão com a API. Verifique se a URL está correta: ${url}`);
+        }
+        if (error.message.includes('CORS')) {
+          throw new Error('Erro de CORS. Verifique se o backend está configurado para aceitar requisições desta origem.');
+        }
+      }
+      // Se for erro de redirecionamento, fornece mensagem mais clara
+      if (error.message && error.message.includes('redirect')) {
+        throw new Error(`Erro de redirecionamento. Verifique se a URL da API está correta (sem barra final): ${this.baseURL}`);
       }
       throw error;
     }
 
+    // Verifica se houve redirecionamento (não deveria acontecer com redirect: 'error')
+    if (response.redirected) {
+      throw new Error(`A URL da API foi redirecionada. Verifique se a URL está correta: ${this.baseURL}`);
+    }
+
+    // Verifica se a resposta é do tipo CORS error (status 0 geralmente indica erro de CORS)
+    if (response.status === 0) {
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'esta origem';
+      throw new Error(`Erro de CORS. Verifique se o backend está configurado para aceitar requisições de ${origin}. URL da API: ${this.baseURL}`);
+    }
+
     if (!response.ok) {
       let errorMessage = `Erro ${response.status}: ${response.statusText}`;
+      
+      // Mensagens específicas para erros comuns
+      if (response.status === 404) {
+        errorMessage = `Endpoint não encontrado: ${url}. Verifique se a URL da API está correta: ${this.baseURL}`;
+      } else if (response.status === 500) {
+        errorMessage = 'Erro interno do servidor. Tente novamente mais tarde.';
+      } else if (response.status === 503) {
+        errorMessage = 'Serviço temporariamente indisponível. Tente novamente mais tarde.';
+      }
       
       try {
         const errorData = await response.json();
